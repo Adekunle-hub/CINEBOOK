@@ -1,7 +1,9 @@
 import axios from "axios";
 
+
+const backend = process.env.NEXT_PUBLIC_API_URL
 const api = axios.create({
-  baseURL: "http://localhost:5000/",
+  baseURL: backend || 'http://localhost:5000',
   withCredentials: true,
 });
 
@@ -45,7 +47,7 @@ api.interceptors.response.use(
       
       try {
         const { data } = await axios.post(
-          "http://localhost:5000/auth/refresh",
+          `${backend}/auth/refresh`,
           {},
           { withCredentials: true }
         );
