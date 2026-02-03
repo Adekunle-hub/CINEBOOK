@@ -1,0 +1,564 @@
+// // ============================================
+// // 1. INSTALL DEPENDENCIES
+// // ============================================
+// // npm install mongoose cloudinary multer multer-storage-cloudinary express dotenv
+
+// // ============================================
+// // 2. ENVIRONMENT VARIABLES (.env)
+// // ============================================
+// /*
+// MONGODB_URI=your_mongodb_connection_string
+// CLOUDINARY_CLOUD_NAME=your_cloud_name
+// CLOUDINARY_API_KEY=your_api_key
+// CLOUDINARY_API_SECRET=your_api_secret
+// */
+
+// // ============================================
+// // 3. CLOUDINARY CONFIGURATION (config/cloudinary.js)
+// // ============================================
+// const cloudinary = require('cloudinary').v2;
+// const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// const multer = require('multer');
+
+// cloudinary.config({
+//   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+//   api_key: process.env.CLOUDINARY_API_KEY,
+//   api_secret: process.env.CLOUDINARY_API_SECRET
+// });
+
+// const storage = new CloudinaryStorage({
+//   cloudinary: cloudinary,
+//   params: {
+//     folder: 'uploads',
+//     allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+//     transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
+//   }
+// });
+
+// const upload = multer({ storage: storage });
+
+// module.exports = { cloudinary, upload };
+
+// // ============================================
+// // 4. MONGOOSE MODEL (models/Post.js)
+// // ============================================
+// const mongoose = require('mongoose');
+
+// const postSchema = new mongoose.Schema({
+//   title: {
+//     type: String,
+//     required: true
+//   },
+//   description: {
+//     type: String,
+//     required: true
+//   },
+//   image: {
+//     url: String,
+//     publicId: String
+//   },
+//   // Add multiple images if needed
+//   images: [{
+//     url: String,
+//     publicId: String
+//   }],
+//   createdAt: {
+//     type: Date,
+//     default: Date.now
+//   }
+// });
+
+// module.exports = mongoose.model('Post', postSchema);
+
+// // ============================================
+// // 5. ROUTES (routes/posts.js)
+// // ============================================
+// const express = require('express');
+// const router = express.Router();
+// const Post = require('../models/Post');
+// const { upload, cloudinary } = require('../config/cloudinary');
+
+// // CREATE - Upload single image
+// router.post('/posts', upload.single('image'), async (req, res) => {
+//   try {
+//     const { title, description } = req.body;
+    
+//     const newPost = new Post({
+//       title,
+//       description,
+//       image: {
+//         url: req.file.path,
+//         publicId: req.file.filename
+//       }
+//     });
+
+//     await newPost.save();
+//     res.status(201).json(newPost);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// // CREATE - Upload multiple images
+// router.post('/posts/multiple', upload.array('images', 5), async (req, res) => {
+//   try {
+//     const { title, description } = req.body;
+    
+//     const images = req.files.map(file => ({
+//       url: file.path,
+//       publicId: file.filename
+//     }));
+
+//     const newPost = new Post({
+//       title,
+//       description,
+//       images
+//     });
+
+//     await newPost.save();
+//     res.status(201).json(newPost);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// // GET ALL
+// router.get('/posts', async (req, res) => {
+//   try {
+//     const posts = await Post.find().sort({ createdAt: -1 });
+//     res.json(posts);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// // GET ONE
+// router.get('/posts/:id', async (req, res) => {
+//   try {
+//     const post = await Post.findById(req.params.id);
+//     if (!post) return res.status(404).json({ message: 'Post not found' });
+//     res.json(post);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// // UPDATE
+// router.put('/posts/:id', upload.single('image'), async (req, res) => {
+//   try {
+//     const post = await Post.findById(req.params.id);
+//     if (!post) return res.status(404).json({ message: 'Post not found' });
+
+//     // Delete old image from Cloudinary if new image uploaded
+//     if (req.file && post.image?.publicId) {
+//       await cloudinary.uploader.destroy(post.image.publicId);
+//     }
+
+//     const updateData = {
+//       title: req.body.title || post.title,
+//       description: req.body.description || post.description
+//     };
+
+//     if (req.file) {
+//       updateData.image = {
+//         url: req.file.path,
+//         publicId: req.file.filename
+//       };
+//     }
+
+//     const updatedPost = await Post.findByIdAndUpdate(
+//       req.params.id,
+//       updateData,
+//       { new: true }
+//     );
+
+//     res.json(updatedPost);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// // DELETE
+// router.delete('/posts/:id', async (req, res) => {
+//   try {
+//     const post = await Post.findById(req.params.id);
+//     if (!post) return res.status(404).json({ message: 'Post not found' });
+
+//     // Delete image from Cloudinary
+//     if (post.image?.publicId) {
+//       await cloudinary.uploader.destroy(post.image.publicId);
+//     }
+
+//     // Delete multiple images if they exist
+//     if (post.images?.length > 0) {
+//       for (const img of post.images) {
+//         await cloudinary.uploader.destroy(img.publicId);
+//       }
+//     }
+
+//     await Post.findByIdAndDelete(req.params.id);
+//     res.json({ message: 'Post deleted successfully' });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// module.exports = router;
+
+// // ============================================
+// // 6. SERVER SETUP (server.js)
+// // ============================================
+// const express = require('express');
+// const mongoose = require('mongoose');
+// const cors = require('cors');
+// require('dotenv').config();
+
+// const app = express();
+
+// // Middleware
+// app.use(cors());
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
+
+// // MongoDB Connection
+// mongoose.connect(process.env.MONGODB_URI)
+//   .then(() => console.log('MongoDB connected'))
+//   .catch(err => console.error('MongoDB connection error:', err));
+
+// // Routes
+// const postRoutes = require('./routes/posts');
+// app.use('/api', postRoutes);
+
+// const PORT = process.env.PORT || 5000;
+// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+
+// // ============================================
+// // REACT FRONTEND - Complete Implementation
+// // ============================================
+
+// // ============================================
+// // 1. CREATE POST WITH IMAGE (Single Upload)
+// // ============================================
+// import { useState } from 'react';
+
+// function CreatePost() {
+//   const [formData, setFormData] = useState({
+//     title: '',
+//     description: '',
+//     image: null
+//   });
+//   const [preview, setPreview] = useState(null);
+//   const [loading, setLoading] = useState(false);
+
+//   const handleImageChange = (e) => {
+//     const file = e.target.files[0];
+//     if (file) {
+//       setFormData({ ...formData, image: file });
+//       setPreview(URL.createObjectURL(file));
+//     }
+//   };
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+//     setLoading(true);
+
+//     const data = new FormData();
+//     data.append('title', formData.title);
+//     data.append('description', formData.description);
+//     data.append('image', formData.image);
+
+//     try {
+//       const response = await fetch('http://localhost:5000/api/posts', {
+//         method: 'POST',
+//         body: data
+//       });
+
+//       const result = await response.json();
+//       console.log('Post created:', result);
+      
+//       // Reset form
+//       setFormData({ title: '', description: '', image: null });
+//       setPreview(null);
+//       alert('Post created successfully!');
+//     } catch (error) {
+//       console.error('Error:', error);
+//       alert('Failed to create post');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   return (
+//     <form onSubmit={handleSubmit}>
+//       <input
+//         type="text"
+//         placeholder="Title"
+//         value={formData.title}
+//         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+//         required
+//       />
+      
+//       <textarea
+//         placeholder="Description"
+//         value={formData.description}
+//         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+//         required
+//       />
+      
+//       <input
+//         type="file"
+//         accept="image/*"
+//         onChange={handleImageChange}
+//         required
+//       />
+      
+//       {preview && <img src={preview} alt="Preview" style={{ width: '200px' }} />}
+      
+//       <button type="submit" disabled={loading}>
+//         {loading ? 'Uploading...' : 'Create Post'}
+//       </button>
+//     </form>
+//   );
+// }
+
+// // ============================================
+// // 2. MULTIPLE IMAGES UPLOAD
+// // ============================================
+// function CreatePostMultiple() {
+//   const [formData, setFormData] = useState({
+//     title: '',
+//     description: '',
+//     images: []
+//   });
+//   const [previews, setPreviews] = useState([]);
+
+//   const handleImagesChange = (e) => {
+//     const files = Array.from(e.target.files);
+//     setFormData({ ...formData, images: files });
+    
+//     const previewUrls = files.map(file => URL.createObjectURL(file));
+//     setPreviews(previewUrls);
+//   };
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+
+//     const data = new FormData();
+//     data.append('title', formData.title);
+//     data.append('description', formData.description);
+    
+//     formData.images.forEach(image => {
+//       data.append('images', image);
+//     });
+
+//     try {
+//       const response = await fetch('http://localhost:5000/api/posts/multiple', {
+//         method: 'POST',
+//         body: data
+//       });
+
+//       const result = await response.json();
+//       console.log('Post created:', result);
+//     } catch (error) {
+//       console.error('Error:', error);
+//     }
+//   };
+
+//   return (
+//     <form onSubmit={handleSubmit}>
+//       <input
+//         type="text"
+//         placeholder="Title"
+//         value={formData.title}
+//         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+//       />
+      
+//       <input
+//         type="file"
+//         multiple
+//         accept="image/*"
+//         onChange={handleImagesChange}
+//       />
+      
+//       <div style={{ display: 'flex', gap: '10px' }}>
+//         {previews.map((preview, idx) => (
+//           <img key={idx} src={preview} alt={`Preview ${idx}`} style={{ width: '100px' }} />
+//         ))}
+//       </div>
+      
+//       <button type="submit">Create Post</button>
+//     </form>
+//   );
+// }
+
+// // ============================================
+// // 3. FETCH AND DISPLAY ALL POSTS
+// // ============================================
+// import { useEffect, useState } from 'react';
+
+// function PostsList() {
+//   const [posts, setPosts] = useState([]);
+//   const [loading, setLoading] = useState(true);
+
+//   useEffect(() => {
+//     fetchPosts();
+//   }, []);
+
+//   const fetchPosts = async () => {
+//     try {
+//       const response = await fetch('http://localhost:5000/api/posts');
+//       const data = await response.json();
+//       setPosts(data);
+//     } catch (error) {
+//       console.error('Error fetching posts:', error);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   if (loading) return <div>Loading...</div>;
+
+//   return (
+//     <div>
+//       {posts.map(post => (
+//         <div key={post._id} style={{ marginBottom: '20px', border: '1px solid #ccc', padding: '10px' }}>
+//           <h2>{post.title}</h2>
+//           <p>{post.description}</p>
+          
+//           {post.image && (
+//             <img 
+//               src={post.image.url} 
+//               alt={post.title}
+//               style={{ width: '100%', maxWidth: '500px' }}
+//             />
+//           )}
+          
+//           {post.images && post.images.length > 0 && (
+//             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+//               {post.images.map((img, idx) => (
+//                 <img 
+//                   key={idx}
+//                   src={img.url} 
+//                   alt={`${post.title} ${idx}`}
+//                   style={{ width: '200px' }}
+//                 />
+//               ))}
+//             </div>
+//           )}
+          
+//           <small>Created: {new Date(post.createdAt).toLocaleDateString()}</small>
+//         </div>
+//       ))}
+//     </div>
+//   );
+// }
+
+// // ============================================
+// // 4. FETCH SINGLE POST
+// // ============================================
+// function SinglePost({ postId }) {
+//   const [post, setPost] = useState(null);
+
+//   useEffect(() => {
+//     const fetchPost = async () => {
+//       try {
+//         const response = await fetch(`http://localhost:5000/api/posts/${postId}`);
+//         const data = await response.json();
+//         setPost(data);
+//       } catch (error) {
+//         console.error('Error:', error);
+//       }
+//     };
+
+//     fetchPost();
+//   }, [postId]);
+
+//   if (!post) return <div>Loading...</div>;
+
+//   return (
+//     <div>
+//       <h1>{post.title}</h1>
+//       <p>{post.description}</p>
+//       {post.image && <img src={post.image.url} alt={post.title} />}
+//     </div>
+//   );
+// }
+
+// // ============================================
+// // 5. UPDATE POST
+// // ============================================
+// function UpdatePost({ postId }) {
+//   const [formData, setFormData] = useState({
+//     title: '',
+//     description: '',
+//     image: null
+//   });
+
+//   const handleUpdate = async (e) => {
+//     e.preventDefault();
+
+//     const data = new FormData();
+//     data.append('title', formData.title);
+//     data.append('description', formData.description);
+//     if (formData.image) {
+//       data.append('image', formData.image);
+//     }
+
+//     try {
+//       const response = await fetch(`http://localhost:5000/api/posts/${postId}`, {
+//         method: 'PUT',
+//         body: data
+//       });
+
+//       const result = await response.json();
+//       console.log('Post updated:', result);
+//       alert('Post updated successfully!');
+//     } catch (error) {
+//       console.error('Error:', error);
+//     }
+//   };
+
+//   return (
+//     <form onSubmit={handleUpdate}>
+//       <input
+//         type="text"
+//         placeholder="Title"
+//         value={formData.title}
+//         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+//       />
+//       <textarea
+//         placeholder="Description"
+//         value={formData.description}
+//         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+//       />
+//       <input
+//         type="file"
+//         accept="image/*"
+//         onChange={(e) => setFormData({ ...formData, image: e.target.files[0] })}
+//       />
+//       <button type="submit">Update Post</button>
+//     </form>
+//   );
+// }
+
+// // ============================================
+// // 6. DELETE POST
+// // ============================================
+// async function deletePost(postId) {
+//   try {
+//     const response = await fetch(`http://localhost:5000/api/posts/${postId}`, {
+//       method: 'DELETE'
+//     });
+
+//     const result = await response.json();
+//     console.log('Post deleted:', result);
+//     alert('Post deleted successfully!');
+//   } catch (error) {
+//     console.error('Error:', error);
+//   }
+// } 
+
+// // Usage: <button onClick={() => deletePost(post._id)}>Delete</button>
+
+// export { CreatePost, CreatePostMultiple, PostsList, SinglePost, UpdatePost, deletePost };
