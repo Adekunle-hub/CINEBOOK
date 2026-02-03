@@ -8,7 +8,6 @@ const api = axios.create({
 });
 
 let accessToken = "";
-
 export const setAccessToken = (token: string) => {
   accessToken = token;
   console.log("Access token saved:", token);
