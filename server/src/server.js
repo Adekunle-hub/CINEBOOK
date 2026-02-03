@@ -6,9 +6,9 @@ import connectToDb from "./database/db.js";
 import userRoute from "./routes/user-route.js";
 import videoRoute from "./routes/video-route.js"
 import postRoute from "./routes/post-route.js"
-import { authenticateToken } from "./middleware/authenticateUser.js";
+
 import errorHandler from "./middleware/errorMiddleware.js";
-import globalLimiter from "./utils/rateLimit.js";
+import globalLimiter from "./utils/ratelimit.js";
 import passport from "./config/passport.js"
 
 dotenv.config();
