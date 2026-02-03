@@ -14,7 +14,7 @@ const redirectUri = process.env.NODE_ENV === 'production'
   ? `${process.env.SERVER_URL}/auth/google/callback`
   : `http://localhost:${process.env.PORT}/auth/google/callback`;
 
-googleAuthUrl.searchParams.append('redirect_uri', redirectUri);
+
 
 //handle sign up
 export const registerUser = async (req, res) => {
