@@ -1,12 +1,12 @@
 "use client"
-import { useEffect } from "react"
+import { Suspense, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 
-export default function AuthCallback() {
+function AuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { setIsAuthenticated, setUser } = useAuth() // You'll need these functions
+  const { setIsAuthenticated, setUser } = useAuth()
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -24,14 +24,14 @@ export default function AuthCallback() {
         
         // Store the access token
         localStorage.setItem("accessToken", token)
-
+        
         // Fetch user profile with the token
         try {
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-            credentials: 'include', // Important for cookies
+            credentials: 'include',
           })
 
           if (response.ok) {
@@ -57,7 +57,7 @@ export default function AuthCallback() {
     }
 
     handleCallback()
-  }, [searchParams, router])
+  }, [searchParams, router, setIsAuthenticated, setUser])
 
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -67,5 +67,21 @@ export default function AuthCallback() {
         <p className="text-muted-foreground">Please wait while we complete your authentication</p>
       </div>
     </div>
+  )
+}
+
+export default function AuthCallback() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <h2 className="text-2xl font-bold mb-2">Loading...</h2>
+          <p className="text-muted-foreground">Please wait</p>
+        </div>
+      </div>
+    }>
+      <AuthCallbackContent />
+    </Suspense>
   )
 }
