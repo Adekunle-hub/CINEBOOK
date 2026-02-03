@@ -9,6 +9,13 @@ import {
 } from "../validators/authValidators.js";
 import passport from "../config/passport.js";
 
+
+const redirectUri = process.env.NODE_ENV === 'production' 
+  ? `${process.env.SERVER_URL}/auth/google/callback`
+  : `http://localhost:${process.env.PORT}/auth/google/callback`;
+
+googleAuthUrl.searchParams.append('redirect_uri', redirectUri);
+
 //handle sign up
 export const registerUser = async (req, res) => {
   logger.info("Hitting the registration endpoint");
@@ -285,7 +292,7 @@ export const googleAuth = (req, res) => {
   const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   
   googleAuthUrl.searchParams.append('client_id', process.env.GOOGLE_CLIENT_ID);
-  googleAuthUrl.searchParams.append('redirect_uri', `http://localhost:${process.env.PORT}/auth/google/callback`);
+googleAuthUrl.searchParams.append('redirect_uri', redirectUri);
   googleAuthUrl.searchParams.append('response_type', 'code');
   googleAuthUrl.searchParams.append('scope', 'profile email');
   googleAuthUrl.searchParams.append('access_type', 'offline');
